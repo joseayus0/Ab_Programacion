@@ -33,3 +33,17 @@ int main() {
     std::cout << "\nCitas programadas:\n";
     cita1.mostrarCita();
     cita2.mostrarCita();
+
+
+
+    // Actualizar la dirección del paciente 2.
+    std::cout << "\nsctualizando la dirección del paciente María Gómez...\n";
+    paciente2.actualizarDatos("Nueva Dirección 789");
+    std::cout << "La nueva dirección de " << paciente2.getNombre() << " es actualizada con éxito.\n";
+
+    // Fin del programa.
+    std::cout << "\nFin del programa. ¡Gracias por usar el sistema de gestión hospitalaria!\n";
+
+    return 0;
+}
+
