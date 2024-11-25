@@ -12,7 +12,7 @@ endif()
 project ("Ab_Programacion")
 
 # Add source to this project's executable.
-add_executable (Ab_Programacion "Ab_Programacion.cpp" "Ab_Programacion.h" "clases.cpp")
+add_executable (Ab_Programacion   )
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET Ab_Programacion PROPERTY CXX_STANDARD 20)
