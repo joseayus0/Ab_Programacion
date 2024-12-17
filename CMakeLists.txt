@@ -1,21 +1,20 @@
-﻿# CMakeList.txt : CMake project for Ab_Programacion, include source and define
-# project specific logic here.
-#
-cmake_minimum_required (VERSION 3.8)
+﻿# Versión mínima de CMake requerida
+cmake_minimum_required(VERSION 3.10)
 
-# Enable Hot Reload for MSVC compilers if supported.
-if (POLICY CMP0141)
-  cmake_policy(SET CMP0141 NEW)
-  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
-endif()
+# Nombre del proyecto
+project(SistemaHospitalario LANGUAGES CXX)
 
-project ("Ab_Programacion")
+# Configurar el estándar de C++
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Add source to this project's executable.
-add_executable (Ab_Programacion   )
+# Especificar las carpetas de encabezados
+include_directories(SistemaHospitalario/include)
 
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET Ab_Programacion PROPERTY CXX_STANDARD 20)
-endif()
-
-# TODO: Add tests and install targets if needed.
+# Agregar archivos fuente al ejecutable
+add_executable(SistemaHospitalario
+    SistemaHospitalario/main.cpp
+    SistemaHospitalario/src/Citamedica.cpp
+    SistemaHospitalario/src/Medico.cpp
+    SistemaHospitalario/src/Paciente.cpp
+)
