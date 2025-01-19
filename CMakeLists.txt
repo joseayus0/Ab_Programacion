@@ -13,8 +13,9 @@ include_directories(SistemaHospitalario/include)
 
 # Agregar archivos fuente al ejecutable
 add_executable(SistemaHospitalario
-    SistemaHospitalario/main.cpp
+    SistemaHospitalario/src/main.cpp
     SistemaHospitalario/src/Citamedica.cpp
     SistemaHospitalario/src/Medico.cpp
     SistemaHospitalario/src/Paciente.cpp
 )
+
