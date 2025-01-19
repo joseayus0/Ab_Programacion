@@ -4,36 +4,45 @@
 #include <string>
 #include <vector>
 
-// Clase para representar el historial clínico del paciente.
+// Clase que representa un registro en el historial clínico de un paciente.
 class HistorialClinico {
 public:
-    std::string descripcion;
-    std::string fecha;
+    std::string descripcion; // Descripción del registro clínico.
+    std::string fecha; // Fecha del registro.
 
-    // Constructor para inicializar un registro del historial clínico.
+    // Constructor que inicializa un registro del historial clínico.
     HistorialClinico(const std::string& desc, const std::string& date);
 };
 
-// Clase para manejar la información del paciente.
+// Clase que representa a un paciente.
 class Paciente {
 private:
-    int id;
-    std::string nombre;
-    std::string direccion;
-    std::vector<HistorialClinico> historial; // Lista de registros médicos.
+    int id; // Identificador único del paciente.
+    std::string nombre; // Nombre completo del paciente.
+    std::string direccion; // Dirección del paciente.
+    std::vector<HistorialClinico> historial; // Lista de registros clínicos.
 
 public:
-    // Constructor para inicializar un paciente.
+    // Constructor que inicializa un paciente con su ID, nombre y dirección.
     Paciente(int id, const std::string& nombre, const std::string& direccion);
 
-    // Métodos para gestionar los datos del paciente.
-    void actualizarDatos(const std::string& nuevaDireccion);
+    // Permite actualizar la dirección del paciente.
+    void actualizarDireccion(const std::string& nuevaDireccion);
+
+    // Agrega un registro al historial clínico del paciente.
     void agregarHistorial(const std::string& descripcion, const std::string& fecha);
+
+    // Muestra el historial clínico completo del paciente.
     void mostrarHistorial() const;
 
-    // Métodos para obtener información básica.
+    // Devuelve el nombre del paciente.
     std::string getNombre() const;
+
+    // Devuelve el identificador único del paciente.
     int getId() const;
+
+    // Devuelve la dirección del paciente.
+    std::string getDireccion() const;
 };
 
 #endif // PACIENTE_HPP
