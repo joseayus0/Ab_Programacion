@@ -3,61 +3,68 @@
 #include <memory>
 #include <algorithm>
 #include <string>
+#include <stdexcept>
+#include <limits>
 #include "Paciente.hpp"
 #include "Medico.hpp"
 #include "CitaMedica.hpp"
+#include "DataManager.hpp"
 
-// Vectores para almacenar dinámicamente los datos
+// Variables globales para almacenar los datos en memoria
 std::vector<std::shared_ptr<Paciente>> pacientes;
 std::vector<std::shared_ptr<Medico>> medicos;
 std::vector<CitaMedica> citas;
+DataManager dataManager;
 
 // Declaraciones de funciones
 void crearPaciente();
 void mostrarPacientes();
+void eliminarPaciente();
 void crearMedico();
 void mostrarMedicos();
 void modificarMedico();
+void eliminarMedico();
 void crearCita();
 void mostrarCitas();
 void modificarCita();
+void eliminarCita();
+void guardarCambios();
+void cargarDatos();
 
-// Función para inicializar datos automáticos
-void inicializarDatos() {
-    auto paciente1 = std::make_shared<Paciente>(1, "Juan Perez", "Calle Falsa 123");
-    auto paciente2 = std::make_shared<Paciente>(2, "Maria Gomez", "Avenida Siempre Viva 456");
-
-    auto medico1 = std::make_shared<Medico>(1, "Dr. Lopez", "Cardiologia");
-    auto medico2 = std::make_shared<Medico>(2, "Dra. Martinez", "Pediatria");
-
-    pacientes.push_back(paciente1);
-    pacientes.push_back(paciente2);
-    medicos.push_back(medico1);
-    medicos.push_back(medico2);
-
-    citas.emplace_back(1, paciente1, medico1, "2024-12-01", "Alta");
-    citas.emplace_back(2, paciente2, medico2, "2024-12-02", "Media");
-
-    std::cout << "Datos iniciales cargados.\n";
+// Función para manejar errores
+void manejarError(const std::string& mensaje, const std::exception& e) {
+    std::cerr << "Error - " << mensaje << ": " << e.what() << std::endl;
 }
 
-// Función para crear un nuevo paciente
-void crearPaciente() {
-    std::string nombre, direccion;
-
-    int id = static_cast<int>(pacientes.size() + 1);
-
-    std::cout << "Ingrese nombre del paciente: ";
-    std::cin.ignore();
-    std::getline(std::cin, nombre);
-    std::cout << "Ingrese direccion del paciente: ";
-    std::getline(std::cin, direccion);
-
-    pacientes.push_back(std::make_shared<Paciente>(id, nombre, direccion));
-    std::cout << "Paciente creado con exito. ID asignado: " << id << "\n";
+// Función para cargar datos iniciales
+void cargarDatos() {
+    try {
+        pacientes = dataManager.cargarPacientes();
+        medicos = dataManager.cargarMedicos();
+        citas = dataManager.cargarCitas(pacientes, medicos);  // Pasamos los vectores como argumentos
+        std::cout << "Datos cargados exitosamente.\n";
+    }
+    catch (const std::exception& e) {
+        manejarError("al cargar datos", e);
+        std::cout << "Iniciando con base de datos vacía.\n";
+    }
 }
 
-// Función para mostrar la lista de pacientes
+// Función para guardar todos los cambios
+void guardarCambios() {
+    try {
+        dataManager.guardarPacientes(pacientes);
+        dataManager.guardarMedicos(medicos);
+        dataManager.guardarCitas(citas);
+        dataManager.realizarBackup();
+        std::cout << "Datos guardados exitosamente.\n";
+    }
+    catch (const std::exception& e) {
+        manejarError("al guardar datos", e);
+    }
+}
+
+// Función para mostrar pacientes
 void mostrarPacientes() {
     if (pacientes.empty()) {
         std::cout << "No hay pacientes registrados.\n";
@@ -67,236 +74,414 @@ void mostrarPacientes() {
     for (const auto& paciente : pacientes) {
         std::cout << "ID: " << paciente->getId()
             << " | Nombre: " << paciente->getNombre()
-            << " | Direccion: " << paciente->getDireccion() << "\n";
+            << " | Dirección: " << paciente->getDireccion() << "\n";
     }
 }
 
-// Función para crear un nuevo médico
-void crearMedico() {
-    std::string nombre, especialidad;
+// Función para crear un nuevo paciente
+void crearPaciente() {
+    try {
+        std::string nombre, direccion;
+        int id = pacientes.empty() ? 1 : pacientes.back()->getId() + 1;
 
-    int id = static_cast<int>(medicos.size() + 1);
+        std::cout << "Ingrese nombre del paciente: ";
+        std::cin.ignore();
+        std::getline(std::cin, nombre);
 
-    std::cout << "Ingrese nombre del medico: ";
-    std::cin.ignore();
-    std::getline(std::cin, nombre);
-    std::cout << "Ingrese especialidad del medico: ";
-    std::getline(std::cin, especialidad);
+        std::cout << "Ingrese direccion del paciente: ";
+        std::getline(std::cin, direccion);
 
-    medicos.push_back(std::make_shared<Medico>(id, nombre, especialidad));
-    std::cout << "Medico creado con exito. ID asignado: " << id << "\n";
+        auto nuevoPaciente = std::make_shared<Paciente>(id, nombre, direccion);
+        pacientes.push_back(nuevoPaciente);
+
+        guardarCambios();
+        std::cout << "Paciente creado con éxito. ID asignado: " << id << "\n";
+    }
+    catch (const std::exception& e) {
+        manejarError("al crear paciente", e);
+    }
 }
 
-// Función para mostrar la lista de médicos
+// Función para eliminar un paciente
+void eliminarPaciente() {
+    try {
+        mostrarPacientes();
+        if (pacientes.empty()) return;
+
+        int id;
+        std::cout << "Ingrese el ID del paciente a eliminar: ";
+        std::cin >> id;
+
+        auto it = std::find_if(pacientes.begin(), pacientes.end(),
+            [id](const std::shared_ptr<Paciente>& p) { return p->getId() == id; });
+
+        if (it != pacientes.end()) {
+            // Verificar si tiene citas pendientes
+            auto tieneCitas = std::any_of(citas.begin(), citas.end(),
+                [id](const CitaMedica& c) { return c.getPaciente()->getId() == id; });
+
+            if (tieneCitas) {
+                std::cout << "No se puede eliminar el paciente porque tiene citas pendientes.\n";
+                return;
+            }
+
+            pacientes.erase(it);
+            guardarCambios();
+            std::cout << "Paciente eliminado con éxito.\n";
+        }
+        else {
+            std::cout << "Paciente no encontrado.\n";
+        }
+    }
+    catch (const std::exception& e) {
+        manejarError("al eliminar paciente", e);
+    }
+}
+
+// Función para mostrar médicos
 void mostrarMedicos() {
     if (medicos.empty()) {
-        std::cout << "No hay medicos registrados.\n";
+        std::cout << "No hay médicos registrados.\n";
         return;
     }
-    std::cout << "\nLista de Medicos:\n";
+    std::cout << "\nLista de Médicos:\n";
     for (const auto& medico : medicos) {
         std::cout << "ID: " << medico->getId()
             << " | Nombre: " << medico->getNombre()
             << " | Especialidad: " << medico->getEspecialidad() << "\n";
     }
 }
+// Función para crear un nuevo médico
+void crearMedico() {
+    try {
+        std::string nombre, especialidad;
+        int id = medicos.empty() ? 1 : medicos.back()->getId() + 1;
 
-// Función para modificar un médico
+        std::cout << "Ingrese nombre del médico: ";
+        std::cin.ignore();
+        std::getline(std::cin, nombre);
+
+        std::cout << "Ingrese especialidad del médico: ";
+        std::getline(std::cin, especialidad);
+
+        auto nuevoMedico = std::make_shared<Medico>(id, nombre, especialidad);
+        medicos.push_back(nuevoMedico);
+
+        guardarCambios();
+        std::cout << "Médico creado con éxito. ID asignado: " << id << "\n";
+    }
+    catch (const std::exception& e) {
+        manejarError("al crear médico", e);
+    }
+}
+
+// Función para modificar médico
 void modificarMedico() {
-    mostrarMedicos();
+    try {
+        mostrarMedicos();
+        if (medicos.empty()) return;
 
-    int idMedico;
-    std::cout << "Ingrese el ID del medico a modificar: ";
-    std::cin >> idMedico;
+        int id;
+        std::cout << "Ingrese el ID del médico a modificar: ";
+        std::cin >> id;
 
-    auto medicoIt = std::find_if(medicos.begin(), medicos.end(),
-        [idMedico](const std::shared_ptr<Medico>& m) { return m->getId() == idMedico; });
+        auto it = std::find_if(medicos.begin(), medicos.end(),
+            [id](const std::shared_ptr<Medico>& m) { return m->getId() == id; });
 
-    if (medicoIt == medicos.end()) {
-        std::cout << "Medico no encontrado. Intente de nuevo.\n";
-        return;
+        if (it != medicos.end()) {
+            std::string nuevoNombre, nuevaEspecialidad;
+
+            std::cout << "Ingrese nuevo nombre (" << (*it)->getNombre() << "): ";
+            std::cin.ignore();
+            std::getline(std::cin, nuevoNombre);
+
+            std::cout << "Ingrese nueva especialidad (" << (*it)->getEspecialidad() << "): ";
+            std::getline(std::cin, nuevaEspecialidad);
+
+            (*it)->setNombre(nuevoNombre);
+            (*it)->setEspecialidad(nuevaEspecialidad);
+
+            guardarCambios();
+            std::cout << "Médico modificado con éxito.\n";
+        }
+        else {
+            std::cout << "Médico no encontrado.\n";
+        }
     }
-
-    std::string nuevoNombre, nuevaEspecialidad;
-
-    std::cout << "Modificar nombre actual (" << (*medicoIt)->getNombre() << "): ";
-    std::cin.ignore();
-    std::getline(std::cin, nuevoNombre);
-
-    std::cout << "Modificar especialidad actual (" << (*medicoIt)->getEspecialidad() << "): ";
-    std::getline(std::cin, nuevaEspecialidad);
-
-    (*medicoIt)->setNombre(nuevoNombre);
-    (*medicoIt)->setEspecialidad(nuevaEspecialidad);
-
-    std::cout << "Medico modificado con exito.\n";
-}
-void crearCita() {
-    int idPaciente, idMedico;
-    std::string fecha, prioridad;
-
-    // Mostrar lista de pacientes
-    mostrarPacientes();
-    std::cout << "Ingrese el ID del paciente para la cita: ";
-    std::cin >> idPaciente;
-
-    // Buscar paciente
-    auto pacienteIt = std::find_if(pacientes.begin(), pacientes.end(),
-        [idPaciente](const std::shared_ptr<Paciente>& p) { return p->getId() == idPaciente; });
-
-    if (pacienteIt == pacientes.end()) {
-        std::cout << "Paciente no encontrado. Intente de nuevo.\n";
-        return;
+    catch (const std::exception& e) {
+        manejarError("al modificar médico", e);
     }
-
-    // Mostrar lista de médicos
-    mostrarMedicos();
-    std::cout << "Ingrese el ID del medico para la cita: ";
-    std::cin >> idMedico;
-
-    // Buscar médico
-    auto medicoIt = std::find_if(medicos.begin(), medicos.end(),
-        [idMedico](const std::shared_ptr<Medico>& m) { return m->getId() == idMedico; });
-
-    if (medicoIt == medicos.end()) {
-        std::cout << "Medico no encontrado. Intente de nuevo.\n";
-        return;
-    }
-
-    // Pedir fecha y prioridad
-    std::cin.ignore();
-    std::cout << "Ingrese la fecha de la cita (YYYY-MM-DD): ";
-    std::getline(std::cin, fecha);
-    std::cout << "Ingrese la prioridad (Alta, Media, Baja): ";
-    std::getline(std::cin, prioridad);
-
-    // Crear y guardar la cita
-    int idCita = static_cast<int>(citas.size() + 1);
-    citas.emplace_back(idCita, *pacienteIt, *medicoIt, fecha, prioridad);
-    std::cout << "Cita creada con exito. ID asignado: " << idCita << "\n";
 }
 
-// Función para modificar una cita médica
-void modificarCita() {
-    mostrarCitas();
+// Función para eliminar médico
+void eliminarMedico() {
+    try {
+        mostrarMedicos();
+        if (medicos.empty()) return;
 
-    int idCita;
-    std::cout << "Ingrese el ID de la cita a modificar: ";
-    std::cin >> idCita;
+        int id;
+        std::cout << "Ingrese el ID del médico a eliminar: ";
+        std::cin >> id;
 
-    auto citaIt = std::find_if(citas.begin(), citas.end(),
-        [idCita](const CitaMedica& cita) { return cita.getId() == idCita; });
+        auto it = std::find_if(medicos.begin(), medicos.end(),
+            [id](const std::shared_ptr<Medico>& m) { return m->getId() == id; });
 
-    if (citaIt == citas.end()) {
-        std::cout << "Cita no encontrada. Intente de nuevo.\n";
-        return;
+        if (it != medicos.end()) {
+            // Verificar si tiene citas pendientes
+            auto tieneCitas = std::any_of(citas.begin(), citas.end(),
+                [id](const CitaMedica& c) { return c.getMedico()->getId() == id; });
+
+            if (tieneCitas) {
+                std::cout << "No se puede eliminar el médico porque tiene citas pendientes.\n";
+                return;
+            }
+
+            medicos.erase(it);
+            guardarCambios();
+            std::cout << "Médico eliminado con éxito.\n";
+        }
+        else {
+            std::cout << "Médico no encontrado.\n";
+        }
     }
-
-    std::string nuevaFecha, nuevaPrioridad;
-    int nuevoIdMedico, nuevoIdPaciente;
-
-    std::cout << "Modificar fecha actual (" << citaIt->getFecha() << "): ";
-    std::cin.ignore();
-    std::getline(std::cin, nuevaFecha);
-
-    std::cout << "Modificar prioridad actual (" << citaIt->getPrioridad() << "): ";
-    std::getline(std::cin, nuevaPrioridad);
-
-    mostrarPacientes();
-    std::cout << "Seleccione un nuevo ID de paciente (actual: " << citaIt->getPaciente()->getId() << "): ";
-    std::cin >> nuevoIdPaciente;
-
-    auto nuevoPacienteIt = std::find_if(pacientes.begin(), pacientes.end(),
-        [nuevoIdPaciente](const std::shared_ptr<Paciente>& p) { return p->getId() == nuevoIdPaciente; });
-
-    if (nuevoPacienteIt == pacientes.end()) {
-        std::cout << "Paciente no encontrado. Intente de nuevo.\n";
-        return;
+    catch (const std::exception& e) {
+        manejarError("al eliminar médico", e);
     }
-
-    mostrarMedicos();
-    std::cout << "Seleccione un nuevo ID de medico (actual: " << citaIt->getMedico()->getId() << "): ";
-    std::cin >> nuevoIdMedico;
-
-    auto nuevoMedicoIt = std::find_if(medicos.begin(), medicos.end(),
-        [nuevoIdMedico](const std::shared_ptr<Medico>& m) { return m->getId() == nuevoIdMedico; });
-
-    if (nuevoMedicoIt == medicos.end()) {
-        std::cout << "Medico no encontrado. Intente de nuevo.\n";
-        return;
-    }
-
-    citaIt->setFecha(nuevaFecha);
-    citaIt->setPrioridad(nuevaPrioridad);
-    citaIt->setPaciente(*nuevoPacienteIt);
-    citaIt->setMedico(*nuevoMedicoIt);
-
-    std::cout << "Cita modificada con exito.\n";
 }
-
-// Función para mostrar todas las citas
+// Función para mostrar citas
 void mostrarCitas() {
     if (citas.empty()) {
         std::cout << "No hay citas programadas.\n";
         return;
     }
-    std::cout << "\nLista de Citas Programadas:\n";
+    std::cout << "\nLista de Citas:\n";
     for (const auto& cita : citas) {
         cita.mostrarCita();
     }
 }
 
-// Menú principal
+// Función para crear una nueva cita
+void crearCita() {
+    try {
+        if (pacientes.empty() || medicos.empty()) {
+            std::cout << "Debe haber al menos un paciente y un médico registrados.\n";
+            return;
+        }
+
+        mostrarPacientes();
+        int idPaciente;
+        std::cout << "Ingrese el ID del paciente: ";
+        std::cin >> idPaciente;
+
+        auto paciente = std::find_if(pacientes.begin(), pacientes.end(),
+            [idPaciente](const std::shared_ptr<Paciente>& p) {
+                return p->getId() == idPaciente;
+            });
+
+        if (paciente == pacientes.end()) {
+            std::cout << "Paciente no encontrado.\n";
+            return;
+        }
+
+        mostrarMedicos();
+        int idMedico;
+        std::cout << "Ingrese el ID del médico: ";
+        std::cin >> idMedico;
+
+        auto medico = std::find_if(medicos.begin(), medicos.end(),
+            [idMedico](const std::shared_ptr<Medico>& m) {
+                return m->getId() == idMedico;
+            });
+
+        if (medico == medicos.end()) {
+            std::cout << "Médico no encontrado.\n";
+            return;
+        }
+
+        std::string fecha, prioridad;
+        std::cin.ignore();
+
+        std::cout << "Ingrese fecha (YYYY-MM-DD): ";
+        std::getline(std::cin, fecha);
+
+        std::cout << "Ingrese prioridad (Alta/Media/Baja): ";
+        std::getline(std::cin, prioridad);
+
+        int idCita = citas.empty() ? 1 : citas.back().getId() + 1;
+        citas.emplace_back(idCita, *paciente, *medico, fecha, prioridad);
+
+        guardarCambios();
+        std::cout << "Cita creada con éxito. ID: " << idCita << "\n";
+    }
+    catch (const std::exception& e) {
+        manejarError("al crear cita", e);
+    }
+}
+
+// Función para modificar cita
+void modificarCita() {
+    try {
+        mostrarCitas();
+        if (citas.empty()) return;
+
+        int id;
+        std::cout << "Ingrese el ID de la cita a modificar: ";
+        std::cin >> id;
+
+        auto it = std::find_if(citas.begin(), citas.end(),
+            [id](const CitaMedica& c) { return c.getId() == id; });
+
+        if (it != citas.end()) {
+            std::string nuevaFecha, nuevaPrioridad;
+
+            std::cout << "Ingrese nueva fecha (" << it->getFecha() << "): ";
+            std::cin.ignore();
+            std::getline(std::cin, nuevaFecha);
+
+            std::cout << "Ingrese nueva prioridad (" << it->getPrioridad() << "): ";
+            std::getline(std::cin, nuevaPrioridad);
+
+            it->setFecha(nuevaFecha);
+            it->setPrioridad(nuevaPrioridad);
+
+            guardarCambios();
+            std::cout << "Cita modificada con éxito.\n";
+        }
+        else {
+            std::cout << "Cita no encontrada.\n";
+        }
+    }
+    catch (const std::exception& e) {
+        manejarError("al modificar cita", e);
+    }
+}
+
+// Función para eliminar cita
+void eliminarCita() {
+    try {
+        mostrarCitas();
+        if (citas.empty()) return;
+
+        int id;
+        std::cout << "Ingrese el ID de la cita a eliminar: ";
+        std::cin >> id;
+
+        auto it = std::find_if(citas.begin(), citas.end(),
+            [id](const CitaMedica& c) { return c.getId() == id; });
+
+        if (it != citas.end()) {
+            citas.erase(it);
+            guardarCambios();
+            std::cout << "Cita eliminada con éxito.\n";
+        }
+        else {
+            std::cout << "Cita no encontrada.\n";
+        }
+    }
+    catch (const std::exception& e) {
+        manejarError("al eliminar cita", e);
+    }
+}
+// Función principal
 int main() {
-    inicializarDatos();
+    std::cout << "Sistema de Gestión Hospitalaria\n";
+    std::cout << "Cargando datos...\n";
+    cargarDatos();
 
     int opcion;
     do {
-        std::cout << "\nSistema de Gestion Hospitalaria:\n";
-        std::cout << "1. Crear paciente\n";
-        std::cout << "2. Mostrar pacientes\n";
-        std::cout << "3. Crear cita medica\n";
-        std::cout << "4. Mostrar citas\n";
-        std::cout << "5. Modificar cita\n";
-        std::cout << "6. Crear medico\n";
-        std::cout << "7. Mostrar medicos\n";
-        std::cout << "8. Modificar medico\n";
-        std::cout << "9. Salir\n";
-        std::cout << "Seleccione una opcion: ";
-        std::cin >> opcion;
+        std::cout << "\n=== Menú Principal ===\n";
+        std::cout << "1. Gestión de Pacientes\n";
+        std::cout << "2. Gestión de Médicos\n";
+        std::cout << "3. Gestión de Citas\n";
+        std::cout << "4. Guardar Cambios\n";
+        std::cout << "5. Salir\n";
+        std::cout << "Seleccione una opción: ";
+
+        if (!(std::cin >> opcion)) {
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cout << "Entrada inválida. Por favor, ingrese un número.\n";
+            continue;
+        }
 
         switch (opcion) {
-        case 1:
-            crearPaciente();
+        case 1: {
+            int subOpcion;
+            std::cout << "\n=== Gestión de Pacientes ===\n";
+            std::cout << "1. Crear Paciente\n";
+            std::cout << "2. Mostrar Pacientes\n";
+            std::cout << "3. Eliminar Paciente\n";
+            std::cout << "4. Volver\n";
+            std::cout << "Seleccione una opción: ";
+            std::cin >> subOpcion;
+
+            switch (subOpcion) {
+            case 1: crearPaciente(); break;
+            case 2: mostrarPacientes(); break;
+            case 3: eliminarPaciente(); break;
+            case 4: break;
+            default: std::cout << "Opción inválida\n";
+            }
             break;
-        case 2:
-            mostrarPacientes();
-            break;
-        case 3:
-            crearCita();
-            break;
-        case 4:
-            mostrarCitas();
-            break;
-        case 5:
-            modificarCita();
-            break;
-        case 6:
-            crearMedico();
-            break;
-        case 7:
-            mostrarMedicos();
-            break;
-        case 8:
-            modificarMedico();
-            break;
-        case 9:
-            std::cout << "Saliendo del programa...\n";
-            break;
-        default:
-            std::cout << "Opcion invalida, intente de nuevo.\n";
         }
-    } while (opcion != 9);
+        case 2: {
+            int subOpcion;
+            std::cout << "\n=== Gestión de Médicos ===\n";
+            std::cout << "1. Crear Médico\n";
+            std::cout << "2. Mostrar Médicos\n";
+            std::cout << "3. Modificar Médico\n";
+            std::cout << "4. Eliminar Médico\n";
+            std::cout << "5. Volver\n";
+            std::cout << "Seleccione una opción: ";
+            std::cin >> subOpcion;
+
+            switch (subOpcion) {
+            case 1: crearMedico(); break;
+            case 2: mostrarMedicos(); break;
+            case 3: modificarMedico(); break;
+            case 4: eliminarMedico(); break;
+            case 5: break;
+            default: std::cout << "Opción inválida\n";
+            }
+            break;
+        }
+        case 3: {
+            int subOpcion;
+            std::cout << "\n=== Gestión de Citas ===\n";
+            std::cout << "1. Crear Cita\n";
+            std::cout << "2. Mostrar Citas\n";
+            std::cout << "3. Modificar Cita\n";
+            std::cout << "4. Eliminar Cita\n";
+            std::cout << "5. Volver\n";
+            std::cout << "Seleccione una opción: ";
+            std::cin >> subOpcion;
+
+            switch (subOpcion) {
+            case 1: crearCita(); break;
+            case 2: mostrarCitas(); break;
+            case 3: modificarCita(); break;
+            case 4: eliminarCita(); break;
+            case 5: break;
+            default: std::cout << "Opción inválida\n";
+            }
+            break;
+        }
+        case 4: {
+            guardarCambios();
+            break;
+        }
+        case 5: {
+            std::cout << "Guardando datos antes de salir...\n";
+            guardarCambios();
+            std::cout << "¡Hasta luego!\n";
+            break;
+        }
+        default: {
+            std::cout << "Opción inválida\n";
+        }
+        }
+    } while (opcion != 5);
 
     return 0;
 }
